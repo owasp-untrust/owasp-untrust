@@ -11,7 +11,7 @@ pitch: OWASP-Untrust replaces risky base programming constructs with secure, val
 
 ### Secure, Base-Level, Programming Constructs with OWASP-Untrust
 
-#### **The Problem with Classic Libraries**
+#### **The Problem with Traditional Libraries**
 Traditional programming libraries, while powerful, were not designed with modern security considerations. They rely on outdated assumptions:
 - The executing code and compiled binaries can be trusted.
 - System-level permissions (e.g., root or su) ensure safety.
