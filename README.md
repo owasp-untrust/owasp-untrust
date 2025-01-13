@@ -1,18 +1,11 @@
----
+# OWASP-Untrust
 
-layout: col-sidebar
-title: OWASP untrust
-tags: example-tag
-level: 2
-type: code
-pitch: OWASP-Untrust replaces risky base programming constructs with secure, validated types (e.g., BoxedPath, BoundedString) to enforce safety and prevent vulnerabilities at the core.
-
----
+Replaces risky base programming constructs with secure, validated types (e.g., BoxedPath, BoundedString) to enforce safety and prevent vulnerabilities at the core.
 
 ### Secure, Base-Level, Programming Constructs with OWASP-Untrust
 
-#### **The Problem with Traditional Libraries**
-Traditional programming libraries, while powerful, were not designed with modern security considerations. They rely on outdated assumptions:
+#### **The Problem with Traditional Base Programming Constructs**
+Traditional programming base libraries (i.e. the stabdard lib raries), while powerful, were not designed with modern security considerations. They rely on outdated assumptions:
 - The executing code and compiled binaries can be trusted.
 - System-level permissions (e.g., root or su) ensure safety.
 - Operating systems enforce user-level safety.
