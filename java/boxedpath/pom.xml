@@ -1,13 +1,13 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>org.owasp</groupId>
+    <groupId>io.github.owasp-untrust</groupId>
     <artifactId>untrust-boxedpath</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.2</version>
     <packaging>jar</packaging>
     <name>OWASP Untrust BoxedPath</name>
-    <description>A secure library for handling boxed paths as part of OWASP's untrust utilities.</description>
-    <url>https://github.com/your-repo/owasp-untrust-boxedpath</url>
+    <description>A secure library for handling boxed paths as part of OWASP-untrust's utilities.</description>
+    <url>https://github.com/owasp-untrust/owasp-untrust/tree/main/java/boxedpath</url>
 
     <licenses>
         <license>
@@ -28,9 +28,9 @@
     </developers>
 
     <scm>
-        <connection>scm:git:git://github.com/your-repo/owasp-untrust-boxedpath.git</connection>
-        <developerConnection>scm:git:ssh://git@github.com/your-repo/owasp-untrust-boxedpath.git</developerConnection>
-        <url>https://github.com/your-repo/owasp-untrust-boxedpath</url>
+        <connection>scm:git:git://github.com/owasp-untrsut/owasp-untrust.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/your-repoowasp-untrust/owasp-untrust.git</developerConnection>
+        <url>https://github.com/owasp-untrust/owasp-untrust.git</url>
     </scm>
 
     <distributionManagement>
@@ -115,6 +115,17 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+                <version>0.5.0</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <autoPublish>false</autoPublish>
+                    <deploymentName>${project.artifactId}:${project.version}</deploymentName>
+                    <waitUntil>validated</waitUntil>
+                </configuration>
+           </plugin>
         </plugins>
     </build>
 

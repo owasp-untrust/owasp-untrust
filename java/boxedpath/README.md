@@ -10,7 +10,7 @@ To mitigate these issues, there is a need for a robust mechanism to constrain fi
 ---
 
 #### **The Solution**
-The **Java implementation** of `BoxedPath` and `SandboxPath` provides a secure and controlled environment for file system operations. By leveraging custom `Path`, `FileSystem`, and `FileSystemProvider` classes, this solution enforces sandbox constraints to prevent unauthorized file access.
+The **Java implementation** of `BoxedPath` and `PathSandbox` provides a secure and controlled environment for file system operations. By leveraging custom `Path`, `FileSystem`, and `FileSystemProvider` classes, this solution enforces sandbox constraints to prevent unauthorized file access.
 
 ---
 
@@ -20,7 +20,7 @@ The **Java implementation** of `BoxedPath` and `SandboxPath` provides a secure a
    - Validates that all operations (e.g., `resolve`, `normalize`) remain within the sandbox.
    - Overrides common `Path` methods to enforce security checks.
 
-2. **`SandboxPath`**:
+2. **`PathSandbox`**:
    - Acts as a root for the sandbox environment.
    - Simplifies initialization by wrapping the `BoxedFileSystem`.
 
@@ -37,39 +37,40 @@ The **Java implementation** of `BoxedPath` and `SandboxPath` provides a secure a
 #### **Sample Code**
 
 **Initialization and Basic Operations**
+
 ```java
-import org.owasp.untrust.boxedpath.SandboxPath;
+import org.owasp.untrust.boxedpath.PathSandbox;
 import org.owasp.untrust.boxedpath.BoxedPath;
 
 import java.nio.file.Path;
 import java.io.IOException;
 
 public class BoxedPathExample {
-    public static void main(String[] args) {
-        try {
-            // Define the sandbox root
-            SandboxPath sandbox = SandboxPath.boxroot("/secure/sandbox");
+   public static void main(String[] args) {
+      try {
+         // Define the sandbox root
+         PathSandbox sandbox = boxroot("/secure/sandbox");
 
-            // Create a path within the sandbox
-            BoxedPath filePath = sandbox.of("example.txt");
+         // Create a path within the sandbox
+         BoxedPath filePath = sandbox.resolve("example.txt");
 
-            // Check if the file exists
-            if (filePath.toFile().exists()) {
-                System.out.println("File exists: " + filePath);
-            } else {
-                System.out.println("File does not exist: " + filePath);
-            }
+         // Check if the file exists
+         if (filePath.toFile().exists()) {
+            System.out.println("File exists: " + filePath);
+         } else {
+            System.out.println("File does not exist: " + filePath);
+         }
 
-            // Attempt to resolve a path outside the sandbox
-            try {
-                BoxedPath invalidPath = sandbox.of("../outside.txt");
-            } catch (SecurityException e) {
-                System.out.println("Security Error: " + e.getMessage());
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
+         // Attempt to resolve a path outside the sandbox
+         try {
+            BoxedPath invalidPath = sandbox.resolve("../outside.txt");
+         } catch (SecurityException e) {
+            System.out.println("Security Error: " + e.getMessage());
+         }
+      } catch (IOException e) {
+         e.printStackTrace();
+      }
+   }
 }
 ```
 
@@ -77,7 +78,7 @@ public class BoxedPathExample {
 
 #### **How It Works**
 1. **Sandbox Creation**:
-   - A `SandboxPath` instance defines the root directory for constrained operations.
+   - A `PathSandbox` instance defines the root directory for constrained operations.
    - This instance ensures that all derived paths remain within the root directory.
 
 2. **Path Validation**:
@@ -101,11 +102,14 @@ public class BoxedPathExample {
 #### **Migration from `Path` to `BoxedPath`**
 To migrate existing code using Java's `Path` to the secure `BoxedPath`:
 1. **Initialize a Sandbox**:
-   Replace the root directory with a `SandboxPath` instance.
+   Replace the root directory with a `PathSandbox` instance.
    ```java
-   SandboxPath sandbox = SandboxPath.boxroot("/secure/sandbox");
+   PathSandbox sandbox = PathSandbox.boxroot("/secure/sandbox");
    ```
-
+   or, with static imports:
+   ```java
+   PathSandbox sandbox = boxroot("/secure/sandbox");
+   ```
 2. **Use `BoxedPath`**:
    Replace `Path` operations with `BoxedPath` equivalents.
    **Before**:
@@ -119,15 +123,18 @@ To migrate existing code using Java's `Path` to the secure `BoxedPath`:
    ```java
    BoxedPath path = sandbox.of("/secure/sandbox/example.txt");
 
-   SandboxPath sandbox2 = SandboxPath.boxroot("./sandbox2");
+   PathSandbox sandbox2 = PathSandbox.boxroot("./sandbox2");
+   // option 1
    BoxedPath basePath = sandbox2.of("./sandbox2");
    BoxedPath relativePath = basePath.resolve("subdir/example.txt");
+   // option 2 (no need for basePath)
+   BoxedPath relativePath = sandbox2.resolve("subdir/example.txt");
    ```
 
 3. **Handle Exceptions**:
    Ensure any security violations (e.g., path escaping) are caught and handled.
    ```java
-    import org.owasp.untrust.boxedpath.SandboxPath;
+    import org.owasp.untrust.boxedpath.PathSandbox;
     import org.owasp.untrust.boxedpath.BoxedPath;
 
     import java.io.IOException;
@@ -136,10 +143,10 @@ To migrate existing code using Java's `Path` to the secure `BoxedPath`:
         public static void main(String[] args) {
             try {
                 // Initialize a secure sandbox
-                SandboxPath sandbox = SandboxPath.boxroot("/secure/sandbox");
+                PathSandbox sandbox = PathSandbox.boxroot("/secure/sandbox");
 
                 // Create a secure path within the sandbox
-                BoxedPath filePath = sandbox.of("example.txt");
+                BoxedPath filePath = sandbox.resolve("example.txt");
 
                 // Perform operations
                 if (filePath.toFile().exists()) {
@@ -150,7 +157,7 @@ To migrate existing code using Java's `Path` to the secure `BoxedPath`:
 
                 // Attempt to create a path outside the sandbox
                 try {
-                    BoxedPath invalidPath = sandbox.of("../outside.txt");
+                    BoxedPath invalidPath = sandbox.resolve("../outside.txt");
                 } catch (SecurityException e) {
                     System.out.println("Security Error: " + e.getMessage());
                 }

@@ -7,19 +7,19 @@ import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.util.Collections;
 
-public class SandboxPath {
-    public static SandboxPath boxroot(@NotNull Path sandboxRoot) throws IOException {
-        return new SandboxPath(sandboxRoot);
+public class PathSandbox {
+    public static PathSandbox boxroot(@NotNull Path sandboxRoot) throws IOException {
+        return new PathSandbox(sandboxRoot);
     }
 
-    public static SandboxPath boxroot(String first, String... more) throws IOException {
+    public static PathSandbox boxroot(String first, String... more) throws IOException {
         Path constructedPath = Path.of(first, more);
-        return new SandboxPath(constructedPath);
+        return new PathSandbox(constructedPath);
     }
 
     private final BoxedFileSystem m_fs;
 
-    private SandboxPath(@NotNull Path sandboxRoot) throws IOException {
+    private PathSandbox(@NotNull Path sandboxRoot) throws IOException {
         m_fs = getFilesystem(sandboxRoot);
     }
 
@@ -42,6 +42,14 @@ public class SandboxPath {
 
     public @NotNull BoxedPath of(@NotNull String first, @NotNull String... more) {
         return BoxedPath.of(this, first, more);
+    }
+
+    public @NotNull BoxedPath resolve(@NotNull Path other) {
+        return getRoot().resolve(other);
+    }
+
+    public @NotNull BoxedPath resolve(@NotNull String other) {
+        return resolve(Path.of(other));
     }
 
     BoxedFileSystem getFileSystem() { return m_fs; }

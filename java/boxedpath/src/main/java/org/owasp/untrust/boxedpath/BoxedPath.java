@@ -10,11 +10,11 @@ import java.util.Iterator;
 import java.util.Optional;
 
 public class BoxedPath implements Path {
-    public static @NotNull BoxedPath of(@NotNull SandboxPath sandboxRoot, @NotNull Path path) {
+    public static @NotNull BoxedPath of(@NotNull PathSandbox sandboxRoot, @NotNull Path path) {
         return new BoxedPath(path, sandboxRoot);
     }
 
-    public static @NotNull BoxedPath of(@NotNull SandboxPath sandboxRoot, String first, @NotNull String... more) {
+    public static @NotNull BoxedPath of(@NotNull PathSandbox sandboxRoot, String first, @NotNull String... more) {
         return new BoxedPath(Path.of(first, more), sandboxRoot);
     }
 
@@ -46,7 +46,7 @@ public class BoxedPath implements Path {
         this.m_path = path;
     }
 
-    protected BoxedPath(@NotNull Path path, @NotNull SandboxPath sandboxRoot) {
+    protected BoxedPath(@NotNull Path path, @NotNull PathSandbox sandboxRoot) {
         this(path, sandboxRoot.getFileSystem());
     }
 
