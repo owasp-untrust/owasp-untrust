@@ -9,11 +9,20 @@ import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.FileAttributeView;
 import java.nio.file.spi.FileSystemProvider;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
+// NOTE: public access required for instantiation by Java's service loader
 public class BoxedFileSystemProvider extends FileSystemProvider {
-    private final Map<Path, BoxedFileSystem> m_filesystems = new HashMap<>(10);
+    private final Map<SandboxJailbreak, Map<Path, BoxedFileSystem>> m_filesystems = initFilesystemsContainer();
+
+    private static Map<SandboxJailbreak, Map<Path, BoxedFileSystem>> initFilesystemsContainer() {
+        Map<SandboxJailbreak, Map<Path, BoxedFileSystem>> retval = new HashMap<SandboxJailbreak, Map<Path, BoxedFileSystem>>(2);
+        retval.put(SandboxJailbreak.DISALLOW, new HashMap<>(10));
+        retval.put(SandboxJailbreak.UNCHECKED_SYMLINKS, new HashMap<>(2));
+        return retval;
+    }
 
     @Override
     public String getScheme() {
@@ -23,11 +32,12 @@ public class BoxedFileSystemProvider extends FileSystemProvider {
     @Override
     public FileSystem newFileSystem(URI uri, Map<String, ?> env) throws IOException {
         Path sandboxAbsolutePath = extractSandboxPath(uri);
-        if (m_filesystems.containsKey(sandboxAbsolutePath)) {
+        SandboxJailbreak jailbreakPolicy = extractJailbreakPolicy(uri);
+        if (m_filesystems.get(jailbreakPolicy).containsKey(sandboxAbsolutePath)) {
             throw new FileSystemAlreadyExistsException();
         }
-        BoxedFileSystem newFs = new BoxedFileSystem(this, sandboxAbsolutePath);
-        m_filesystems.put(sandboxAbsolutePath, newFs);
+        BoxedFileSystem newFs = new BoxedFileSystem(this, sandboxAbsolutePath, jailbreakPolicy);
+        m_filesystems.get(jailbreakPolicy).put(sandboxAbsolutePath, newFs);
         return newFs;
     }
 
@@ -39,10 +49,18 @@ public class BoxedFileSystemProvider extends FileSystemProvider {
         return Paths.get(nestedUri).toAbsolutePath().normalize();
     }
 
+    private static SandboxJailbreak extractJailbreakPolicy(URI uri) {
+        String fragment = uri.getFragment();
+        return (fragment != null && fragment.equals("UNCHECKED_SYMLINKS"))
+                ? SandboxJailbreak.UNCHECKED_SYMLINKS
+                : SandboxJailbreak.DISALLOW;
+    }
+
     @Override
     public FileSystem getFileSystem(URI uri) {
         Path sandboxAbsolutePath = extractSandboxPath(uri);
-        BoxedFileSystem fs = m_filesystems.get(sandboxAbsolutePath);
+        SandboxJailbreak jailbreakPolicy = extractJailbreakPolicy(uri);
+        BoxedFileSystem fs = m_filesystems.get(jailbreakPolicy).get(sandboxAbsolutePath);
         if (fs == null) {
             throw new FileSystemNotFoundException();
         }
@@ -140,7 +158,17 @@ public class BoxedFileSystemProvider extends FileSystemProvider {
     }
 
     void removeRegisteredFileSystem(BoxedFileSystem fs) {
-        BoxedFileSystem oldFs = m_filesystems.remove(fs);
-        assert(oldFs != null);
+        SandboxJailbreak jailbreakPolicy = fs.getJailbreakPolicy();
+        Map<Path, BoxedFileSystem> filesystems = m_filesystems.get(jailbreakPolicy);
+        Iterator<Map.Entry<Path, BoxedFileSystem>> it = filesystems.entrySet().iterator();
+        int numRemoved = 0;
+        while (it.hasNext()) {
+            Map.Entry<Path, BoxedFileSystem> entry = it.next();
+            if (entry == fs) {
+                it.remove();
+                ++numRemoved;
+            }
+        }
+        assert(numRemoved == 1);
     }
 }

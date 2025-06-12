@@ -1,9 +1,8 @@
 package org.owasp.untrust.boxedpath;
 
 import javax.validation.constraints.NotNull;
-import java.net.URI;
-import java.nio.file.Path;
 
+import java.net.URI;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.Iterator;
@@ -11,28 +10,42 @@ import java.util.Optional;
 
 public class BoxedPath implements Path {
     public static @NotNull BoxedPath of(@NotNull PathSandbox sandboxRoot, @NotNull Path path) {
-        return new BoxedPath(path, sandboxRoot);
+        return new BoxedPath(sandboxRoot.resolve(path).getUnprotectedPath(), sandboxRoot);
     }
 
     public static @NotNull BoxedPath of(@NotNull PathSandbox sandboxRoot, String first, @NotNull String... more) {
-        return new BoxedPath(Path.of(first, more), sandboxRoot);
+        return of(sandboxRoot, Path.of(first, more));
     }
 
     public static @NotNull URI toUri(@NotNull Path sandbox) {
-        return toUriWithAbsoluteSandbox(sandbox.toAbsolutePath().normalize(), Optional.empty());
+        return toUriWithAbsoluteSandbox(SandboxJailbreak.DISALLOW, sandbox.toAbsolutePath().normalize(), Optional.empty());
     }
 
     public static @NotNull URI toUri(@NotNull Path sandbox, @NotNull Path path) {
-        return toUriWithAbsoluteSandbox(sandbox.toAbsolutePath().normalize(), Optional.of(path));
+        return toUriWithAbsoluteSandbox(SandboxJailbreak.DISALLOW, sandbox.toAbsolutePath().normalize(), Optional.of(path));
     }
 
-    public static @NotNull URI toUriWithAbsoluteSandbox(@NotNull Path sandboxAbsolute, @NotNull Optional<Path> path) {
+    public static @NotNull URI toUri(SandboxJailbreak jailbreakPolicy, @NotNull Path sandbox) {
+        return toUriWithAbsoluteSandbox(jailbreakPolicy, sandbox.toAbsolutePath().normalize(), Optional.empty());
+    }
+
+    public static @NotNull URI toUri(SandboxJailbreak jailbreakPolicy, @NotNull Path sandbox, @NotNull Path path) {
+        return toUriWithAbsoluteSandbox(jailbreakPolicy, sandbox.toAbsolutePath().normalize(), Optional.of(path));
+    }
+
+    private static @NotNull URI toUriWithAbsoluteSandbox(SandboxJailbreak jailbreakPolicy, @NotNull Path sandboxAbsolute, @NotNull Optional<Path> path) {
         URI sandboxRootUri = sandboxAbsolute.toUri();
         String uriString = "sandbox:" + sandboxRootUri;
+
         if (path.isPresent()) {
             String encodedFilePath = path.toString().replace("\\", "/");
             uriString += "!" + encodedFilePath;
         }
+
+        if (jailbreakPolicy == SandboxJailbreak.UNCHECKED_SYMLINKS) {
+            uriString += "#UNCHECKED_SYMLINKS";
+        }
+    
         return URI.create(uriString);
     }
 
@@ -42,7 +55,7 @@ public class BoxedPath implements Path {
     // Constructor validates that the path is within the sandbox
     protected BoxedPath(@NotNull Path path, @NotNull BoxedFileSystem sandboxFs) {
         this.m_sandboxFs = sandboxFs; // sandboxRoot.toAbsolutePath().normalize();
-        validateWithinSandbox(path, sandboxFs.getSandboxAbsolutePath());
+        validateWithinSandbox(sandboxFs.getJailbreakPolicy(), path, sandboxFs.getSandboxAbsolutePath());
         this.m_path = path;
     }
 
@@ -51,10 +64,35 @@ public class BoxedPath implements Path {
     }
 
     // Validates if the path is within the sandbox
-    private static void validateWithinSandbox(@NotNull Path candidatePath, @NotNull Path sandboxAbsolute) {
+    private static void validateWithinSandbox(SandboxJailbreak jailbreakPolicy, @NotNull Path candidatePath, @NotNull Path sandboxAbsolute) {
         Path absolutePath = candidatePath.toAbsolutePath().normalize();
         if (!absolutePath.startsWith(sandboxAbsolute)) {
             throw new SecurityException("Path " + candidatePath + " is outside the sandbox " + sandboxAbsolute);
+        }
+
+        if (jailbreakPolicy == SandboxJailbreak.DISALLOW) {
+            try {
+                // traverse name parts and turn into real names
+                Path realSandbox = sandboxAbsolute.toRealPath();
+
+                Path relativePart = sandboxAbsolute.relativize(absolutePath);
+                Path realPathPrefix = realSandbox;
+                try {
+                    for (int i = 0 ; i < relativePart.getNameCount() ; ++i) {
+                        realPathPrefix = realPathPrefix.resolve(relativePart.getName(i)).toRealPath();
+                    }
+                }
+                catch (IOException ex) {
+                    // adding path part results in path that doesn't exist on file system, so all path parts from here on are not symlinks
+                }
+                // ensure path part that DOES exist on file system is within sandbox
+                if (!realPathPrefix.startsWith(realSandbox)) {
+                    throw new SecurityException("Path " + candidatePath + " is outside the sandbox " + sandboxAbsolute + " [after resolving symlinks]");
+                }
+            }
+            catch (IOException ex) {
+                // even sandbox path doesn't exist on file system, so it couldn't have a symlink within it... ==> All ok!
+            }
         }
     }
 
@@ -62,6 +100,10 @@ public class BoxedPath implements Path {
     @Override
     public @NotNull BoxedPath resolve(@NotNull Path other) {
         return new BoxedPath(this.m_path.resolve(other), m_sandboxFs);
+    }
+    
+    public @NotNull BoxedPath resolve(@NotNull BoxedPath other) {
+        throw new IllegalArgumentException("Cannot resolve a BoxedPath from a BoxedPath - they both have a sandbox absolute prefix");
     }
 
     @Override
@@ -74,10 +116,14 @@ public class BoxedPath implements Path {
         return new BoxedPath(this.m_path.resolveSibling(other), m_sandboxFs);
     }
 
+    public @NotNull BoxedPath resolveSibling(@NotNull BoxedPath other) {
+        throw new IllegalArgumentException("Cannot resolve a BoxedPath from a BoxedPath - they both have a sandbox absolute prefix");
+    }
+
     @Override
     public @NotNull BoxedPath resolveSibling(@NotNull String other) {
         return resolveSibling(Path.of(other));
-    }
+    }    
 
     @Override
     public @NotNull BoxedPath normalize() {
@@ -86,7 +132,7 @@ public class BoxedPath implements Path {
 
     @Override
     public @NotNull BoxedPath relativize(Path other) {
-        return new BoxedPath(this.m_path.relativize(other), m_sandboxFs);
+        throw new SecurityException("relativization of paths does not work with sandboxing, as all paths must be relative to the sandbox");
     }
 
     @Override
@@ -114,7 +160,7 @@ public class BoxedPath implements Path {
         return this.m_path.getName(index);
     }
 
-    public Path relativeToSandbox() {
+    public Path unprotectedRelativeToSandbox() {
         Path absolutePath = m_path.toAbsolutePath().normalize();
         return m_sandboxFs.getSandboxAbsolutePath().relativize(absolutePath);
     }
@@ -124,6 +170,10 @@ public class BoxedPath implements Path {
         return this.m_path.startsWith(other);
     }
 
+    public boolean startsWith(BoxedPath other) {
+        return this.m_path.startsWith(other.m_path);
+    }
+    
     @Override
     public boolean startsWith(String other) {
         return this.m_path.startsWith(other);
@@ -134,6 +184,10 @@ public class BoxedPath implements Path {
         return this.m_path.endsWith(other);
     }
 
+    public boolean endsWith(BoxedPath other) {
+        return this.m_path.startsWith(other.m_path);
+    }
+    
     @Override
     public boolean endsWith(String other) {
         return this.m_path.endsWith(other);
@@ -141,7 +195,9 @@ public class BoxedPath implements Path {
 
     @Override
     public BoxedPath subpath(int beginIndex, int endIndex) {
-        return new BoxedPath(this.m_path.subpath(beginIndex, endIndex), m_sandboxFs);
+        Path pathAbsolute = this.m_path.isAbsolute() ? this.m_path : this.m_path.toAbsolutePath();
+        int sandboxNamesCount = this.m_sandboxFs.getSandboxAbsolutePath().getNameCount();
+        return new BoxedPath(this.m_sandboxFs.getSandboxAbsolutePath().resolve(pathAbsolute.subpath(beginIndex + sandboxNamesCount, endIndex + sandboxNamesCount)), m_sandboxFs);
     }
 
     @Override
@@ -168,6 +224,10 @@ public class BoxedPath implements Path {
     public int compareTo(Path other) {
         return this.m_path.compareTo(other);
     }
+    
+    public int compareTo(BoxedPath other) {
+        return this.m_path.compareTo(other.m_path);
+    }
 
     @Override
     public String toString() {
@@ -176,7 +236,7 @@ public class BoxedPath implements Path {
 
     @Override
     public @NotNull URI toUri() {
-        return toUriWithAbsoluteSandbox(m_sandboxFs.getSandboxAbsolutePath(), Optional.of(m_path));
+        return toUriWithAbsoluteSandbox(m_sandboxFs.getJailbreakPolicy(), m_sandboxFs.getSandboxAbsolutePath(), Optional.of(m_path));
     }
 
     @Override

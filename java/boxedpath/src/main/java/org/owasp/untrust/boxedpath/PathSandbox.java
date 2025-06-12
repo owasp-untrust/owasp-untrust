@@ -8,40 +8,53 @@ import java.nio.file.Path;
 import java.util.Collections;
 
 public class PathSandbox {
-    public static PathSandbox boxroot(@NotNull Path sandboxRoot) throws IOException {
+    public static PathSandbox boxroot(@NotNull Path sandboxRoot) {
         return new PathSandbox(sandboxRoot);
     }
 
-    public static PathSandbox boxroot(String first, String... more) throws IOException {
+    public static PathSandbox boxroot(SandboxJailbreak jailbreakPolicy, @NotNull Path sandboxRoot) {
+        return new PathSandbox(jailbreakPolicy, sandboxRoot);
+    }
+
+    public static PathSandbox boxroot(String first, String... more) {
         Path constructedPath = Path.of(first, more);
         return new PathSandbox(constructedPath);
     }
 
-    private final BoxedFileSystem m_fs;
-
-    private PathSandbox(@NotNull Path sandboxRoot) throws IOException {
-        m_fs = getFilesystem(sandboxRoot);
+    public static PathSandbox boxroot(SandboxJailbreak jailbreakPolicy, String first, String... more) {
+        Path constructedPath = Path.of(first, more);
+        return new PathSandbox(jailbreakPolicy, constructedPath);
     }
 
-    private static BoxedFileSystem getFilesystem(@NotNull Path sandboxRoot) {
+    private static BoxedFileSystem getFilesystem(SandboxJailbreak jailbreakPolicy, @NotNull Path sandboxRoot) {
         try {
-            return (BoxedFileSystem) FileSystems.newFileSystem(BoxedPath.toUri(sandboxRoot), Collections.emptyMap());
+            return (BoxedFileSystem) FileSystems.newFileSystem(BoxedPath.toUri(jailbreakPolicy, sandboxRoot), Collections.emptyMap());
         }
         catch (FileSystemAlreadyExistsException | IOException ex) {
-            return (BoxedFileSystem) FileSystems.getFileSystem(BoxedPath.toUri(sandboxRoot));
+            return (BoxedFileSystem) FileSystems.getFileSystem(BoxedPath.toUri(jailbreakPolicy, sandboxRoot));
         }
+    }
+
+    private final BoxedFileSystem m_fs;
+
+    private PathSandbox(@NotNull Path sandboxRoot) {
+        this(SandboxJailbreak.DISALLOW, sandboxRoot);
+    }
+
+    private PathSandbox(SandboxJailbreak jailbreakPolicy, @NotNull Path sandboxRoot) {
+        m_fs = getFilesystem(jailbreakPolicy, sandboxRoot);
     }
 
     public @NotNull BoxedPath getRoot() {
-        return BoxedPath.of(this, this.m_fs.getSandboxAbsolutePath());
+        return new BoxedPath(this.m_fs.getSandboxAbsolutePath(), this);
     }
 
     public @NotNull BoxedPath of(@NotNull Path path) {
-        return BoxedPath.of(this, path);
+        return new BoxedPath(path, this);
     }
 
     public @NotNull BoxedPath of(@NotNull String first, @NotNull String... more) {
-        return BoxedPath.of(this, first, more);
+        return of(Path.of(first, more));
     }
 
     public @NotNull BoxedPath resolve(@NotNull Path other) {
@@ -52,5 +65,8 @@ public class PathSandbox {
         return resolve(Path.of(other));
     }
 
+    // intentionally package private
+    SandboxJailbreak getJailbreakPolicy() { return m_fs.getJailbreakPolicy(); }
+    // intentionally package private
     BoxedFileSystem getFileSystem() { return m_fs; }
 }
