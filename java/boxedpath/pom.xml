@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.github.owasp-untrust</groupId>
     <artifactId>untrust-boxedpath</artifactId>
-    <version>0.2</version>
+    <version>0.3</version>
     <packaging>jar</packaging>
     <name>OWASP Untrust BoxedPath</name>
     <description>A secure library for handling boxed paths as part of OWASP-untrust's utilities.</description>
